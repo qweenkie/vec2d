@@ -1,0 +1,23 @@
+[package]
+name = "vector_2d"
+
+version = "0.1.0"
+edition = "2024"
+
+description = "A toy project, that implements a 2D vector (grid), stored in a 1D vector"
+readme = "README.md"
+
+repository = "https://github.com/qweenkie/vec2d"
+license = "MIT"
+
+categories = ["data-structures"]
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"], optional = true }
+
+[features]
+default = []
+serialize = ["dep:serde"]
+
+[package.metadata.docs.rs]
+all-features = true
