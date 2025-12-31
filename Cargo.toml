@@ -1,7 +1,7 @@
 [package]
 name = "vector_2d"
 
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 
 description = "A toy project, that implements a 2D vector (grid), stored in a 1D vector"

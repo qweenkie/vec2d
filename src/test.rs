@@ -95,6 +95,26 @@ mod tests {
     }
 
     #[test]
+    fn extend_works() {
+        let mut grid = Vec2D::from_vec((0..6).collect(), 3).unwrap();
+
+        let to_append: Vec<_> = (6..9).collect();
+        grid.extend(to_append).unwrap();
+
+        assert_eq!(grid.cells(), Vec::from([0, 1, 2, 3, 4, 5, 6, 7, 8]));
+    }
+
+    #[test]
+    fn insert_row_works() {
+        let mut grid = Vec2D::from_vec(Vec::from([0, 1, 2, 6, 7, 8]), 3).unwrap();
+
+        let to_insert: Vec<_> = (3..6).collect();
+        grid.insert_row(1, to_insert).unwrap();
+
+        assert_eq!(grid.cells(), Vec::from([0, 1, 2, 3, 4, 5, 6, 7, 8]));
+    }
+
+    #[test]
     fn iter_xy_visits_all_cells() {
         let grid = Vec2D::from_vec((0..4).collect(), 2).unwrap();
 

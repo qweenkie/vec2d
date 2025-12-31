@@ -14,6 +14,7 @@ pub struct Vec2D<T> {
 #[derive(Debug)]
 pub enum Vec2DErr {
     EmptySource,
+    OutOfBounds,
     WidthMismatch(usize, usize),
     ZeroHeight,
     ZeroWidth,
@@ -202,7 +203,8 @@ impl<T> Vec2D<T> {
             return Err(Vec2DErr::ZeroWidth);
         } else if vec.is_empty() {
             return Err(Vec2DErr::EmptySource);
-        } else if !vec.len().is_multiple_of(width) {
+        }
+        if !vec.len().is_multiple_of(width) {
             return Err(Vec2DErr::WidthMismatch(vec.len(), width));
         }
 
@@ -276,50 +278,95 @@ impl<T> Vec2D<T> {
         Some(&mut self.cells[(y * self.width)..((y + 1) * self.width)])
     }
 
-    /// Inserts a row (or rows) at the end of the vector.
+    /// Appends a row (or rows) at the end of the vector.
     ///
     /// The row's size has to be a multiple of the 2D vector's width.
     /// If the row's size is bigger that the 2D vector's width, but is still
     /// a multiple of width, the row will be inserted as multiple rows.
     ///
-    /// This function implies, that the row is a mutable reference to a vector,
-    /// and will empty the original container upon insertion.
-    /// If the row cannot be passed as mutable, consider using `insert_row_with_copy`.
+    /// This function implies it **will empty the original container upon insertion**.
+    /// If you want to keep the container's contents, consider `extend_cloned`.
     ///
     /// # Errors:
     /// Returns `Vec2DErr::WidthMismatch(*rows_length*, *2d_vectors_width*)` if the
     /// row's length is not a multiple of the 2D vector's width.
-    pub fn insert_row(&mut self, row: &mut Vec<T>) -> Result<(), Vec2DErr> {
+    pub fn extend(&mut self, row: Vec<T>) -> Result<(), Vec2DErr> {
         if !row.len().is_multiple_of(self.width) {
             return Err(Vec2DErr::WidthMismatch(row.len(), self.width));
         }
 
-        self.cells.append(row);
+        self.cells.extend(row);
         Ok(())
     }
 
-    /// Inserts a row (or rows) at the end of the vector.
+    /// Appends a row (or rows) at the end of the vector.
     ///
     /// The row's size has to be a multiple of the 2D vector's width.
     /// If the row's size is bigger that the 2D vector's width, but is still
     /// a multiple of width, the row will be inserted as multiple rows.
     ///
-    /// This function implies, that the row is copyable.
-    /// If it is not copyable, but can be mutated and you are ok with discarding
-    /// it's contents, consider using `insert_row`.
+    /// This function implies that the row's elements can be cloned.
+    ///
+    /// This should only be used if you need to preserve the row's contents in
+    /// the original container, and is slower than `extend`.
     ///
     /// # Errors:
     /// Returns `Vec2DErr::WidthMismatch(*rows_length*, *2d_vectors_width*)` if the
     /// row's length is not a multiple of the 2D vector's width.
-    pub fn insert_row_with_copy(&mut self, row: &Vec<T>) -> Result<(), Vec2DErr>
+    pub fn extend_cloned(&mut self, row: &[T]) -> Result<(), Vec2DErr>
     where
-        Vec<T>: Copy,
+        T: Clone,
     {
         if !row.len().is_multiple_of(self.width) {
             return Err(Vec2DErr::WidthMismatch(row.len(), self.width));
         }
 
-        self.cells.extend(*row);
+        self.cells.extend(row.iter().cloned());
+        Ok(())
+    }
+
+    /// Inserts a row (or rows) at a given y coordinate.
+    ///
+    /// The row's size has to be a multiple of the 2D vector's width.
+    /// If the row's size is bigger that the 2D vector's width, but is still
+    /// a multiple of width, the row will be inserted as multiple rows.
+    ///
+    /// Note, that the function will discard the given row, so if you want to
+    /// keep it for some reason, consider cloning it before passing it in, or
+    /// using `insert_row_cloned`.
+    pub fn insert_row(&mut self, y: usize, row: Vec<T>) -> Result<(), Vec2DErr> {
+        if y >= self.height() {
+            return Err(Vec2DErr::OutOfBounds);
+        }
+        if !row.len().is_multiple_of(self.width) {
+            return Err(Vec2DErr::WidthMismatch(row.len(), self.width));
+        }
+
+        let idx = y * self.width;
+        self.cells.splice(idx..idx, row);
+        Ok(())
+    }
+
+    /// Inserts a row (or rows) at a given y coordinate.
+    ///
+    /// The row's size has to be a multiple of the 2D vector's width.
+    /// If the row's size is bigger that the 2D vector's width, but is still
+    /// a multiple of width, the row will be inserted as multiple rows.
+    ///
+    /// This function implies that the row's contents can be cloned.
+    pub fn insert_row_cloned(&mut self, y: usize, row: &[T]) -> Result<(), Vec2DErr>
+    where
+        T: Clone,
+    {
+        if y >= self.height() {
+            return Err(Vec2DErr::OutOfBounds);
+        }
+        if !row.len().is_multiple_of(self.width) {
+            return Err(Vec2DErr::WidthMismatch(row.len(), self.width));
+        }
+
+        let idx = y * self.width;
+        self.cells.splice(idx..idx, row.iter().cloned());
         Ok(())
     }
 
@@ -444,6 +491,9 @@ impl std::fmt::Display for Vec2DErr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Vec2DErr::EmptySource => write!(f, "Source vector is empty."),
+            Vec2DErr::OutOfBounds => {
+                write!(f, "Attempted to acces an index which is out of bounds.")
+            }
             Vec2DErr::WidthMismatch(len, width) => write!(
                 f,
                 "Vector length ({}) is not divisible by given width ({}).",
