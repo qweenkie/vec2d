@@ -276,6 +276,53 @@ impl<T> Vec2D<T> {
         Some(&mut self.cells[(y * self.width)..((y + 1) * self.width)])
     }
 
+    /// Inserts a row (or rows) at the end of the vector.
+    ///
+    /// The row's size has to be a multiple of the 2D vector's width.
+    /// If the row's size is bigger that the 2D vector's width, but is still
+    /// a multiple of width, the row will be inserted as multiple rows.
+    ///
+    /// This function implies, that the row is a mutable reference to a vector,
+    /// and will empty the original container upon insertion.
+    /// If the row cannot be passed as mutable, consider using `insert_row_with_copy`.
+    ///
+    /// # Errors:
+    /// Returns `Vec2DErr::WidthMismatch(*rows_length*, *2d_vectors_width*)` if the
+    /// row's length is not a multiple of the 2D vector's width.
+    pub fn insert_row(&mut self, row: &mut Vec<T>) -> Result<(), Vec2DErr> {
+        if !row.len().is_multiple_of(self.width) {
+            return Err(Vec2DErr::WidthMismatch(row.len(), self.width));
+        }
+
+        self.cells.append(row);
+        Ok(())
+    }
+
+    /// Inserts a row (or rows) at the end of the vector.
+    ///
+    /// The row's size has to be a multiple of the 2D vector's width.
+    /// If the row's size is bigger that the 2D vector's width, but is still
+    /// a multiple of width, the row will be inserted as multiple rows.
+    ///
+    /// This function implies, that the row is copyable.
+    /// If it is not copyable, but can be mutated and you are ok with discarding
+    /// it's contents, consider using `insert_row`.
+    ///
+    /// # Errors:
+    /// Returns `Vec2DErr::WidthMismatch(*rows_length*, *2d_vectors_width*)` if the
+    /// row's length is not a multiple of the 2D vector's width.
+    pub fn insert_row_with_copy(&mut self, row: &Vec<T>) -> Result<(), Vec2DErr>
+    where
+        Vec<T>: Copy,
+    {
+        if !row.len().is_multiple_of(self.width) {
+            return Err(Vec2DErr::WidthMismatch(row.len(), self.width));
+        }
+
+        self.cells.extend(*row);
+        Ok(())
+    }
+
     /// Iterates over all cells, yielding their `(x, y)` coordinates and values.
     pub fn iter_xy(&self) -> impl Iterator<Item = ((usize, usize), &T)> {
         let width = self.width;
@@ -324,6 +371,8 @@ impl<T> Vec2D<T> {
     ///
     /// This includes the north, south, east, and west neighbors.
     /// Out of bound neighbors are skipped.
+    ///
+    /// The values are represented as `((neighbour's coordinates), neighbor's value)`
     pub fn neighbors_von_neumann(
         &self,
         x: usize,
@@ -351,8 +400,9 @@ impl<T> Vec2D<T> {
     /// of the cell at `(x, y)`.
     ///
     /// This includes all surrounding cells except the center cell itself.
-    ///
     /// Out of bound neighbors are skipped.
+    ///
+    /// The values are represented as `((neighbour's coordinates), neighbor's value)`
     pub fn neighbors_moore(
         &self,
         x: usize,
