@@ -216,10 +216,13 @@ impl<T> Vec2D<T> {
         &self.cells
     }
 
-    /// Returns a mutable slice of all cells in row-major order.
-    pub fn cells_mut(&mut self) -> &mut [T] {
-        &mut self.cells
-    }
+    // This function is commented out, because I realized that we SHOULD NOT be
+    // giving out mutable references to the backbone of our vector.
+    //
+    // /// Returns a mutable slice of all cells in row-major order.
+    // pub fn cells_mut(&mut self) -> &mut [T] {
+    //     &mut self.cells
+    // }
 
     /// Returns the width of the grid.
     pub const fn width(&self) -> usize {
@@ -240,6 +243,33 @@ impl<T> Vec2D<T> {
         } else {
             None
         }
+    }
+
+    /// Converts the given index into 2D coordinates (for this 2d vector).
+    ///
+    /// Returns `None` if the coordinates are out of bounds.
+    pub fn coords(&self, idx: usize) -> Option<(usize, usize)> {
+        let (x, y) = (idx / self.width, idx % self.width);
+
+        if x < self.width && y < self.height() {
+            Some((x, y))
+        } else {
+            None
+        }
+    }
+
+    /// Converts `(x, y)` coordinates into a linear index that would work for
+    /// a flat representation of a 2d vector with the specified width.
+    #[inline]
+    pub fn create_index(x: usize, y: usize, width: usize) -> usize {
+        y * width + x
+    }
+
+    /// Converts the given index into 2D coordinates that would work for a
+    /// 2d vector that has the specified width.
+    #[inline]
+    pub fn create_coords(idx: usize, width: usize) -> (usize, usize) {
+        (idx % width, idx / width)
     }
 
     /// Returns a shared reference to the cell at `(x, y)`, if it exists.
@@ -266,7 +296,9 @@ impl<T> Vec2D<T> {
             return None;
         }
 
-        Some(&self.cells[(y * self.width)..((y + 1) * self.width)])
+        let start = y * self.width;
+        let end = (y + 1) * self.width;
+        Some(&self.cells[start..end])
     }
 
     /// Returns a mutable slice representing row `y`, if it exists.
@@ -275,7 +307,9 @@ impl<T> Vec2D<T> {
             return None;
         }
 
-        Some(&mut self.cells[(y * self.width)..((y + 1) * self.width)])
+        let start = y * self.width;
+        let end = (y + 1) * self.width;
+        Some(&mut self.cells[start..end])
     }
 
     /// Appends a row (or rows) at the end of the vector.
@@ -370,6 +404,36 @@ impl<T> Vec2D<T> {
         Ok(())
     }
 
+    /// Discards a row at the given y coordinate, without preserving the values.
+    pub fn discard_row(&mut self, y: usize) -> Result<(), Vec2DErr> {
+        if y >= self.height() {
+            return Err(Vec2DErr::OutOfBounds);
+        }
+
+        let start = y * self.width;
+        let end = start + self.width;
+        self.cells.drain(start..end);
+
+        Ok(())
+    }
+
+    /// Removes a row at the given y coordinate, returning the removed values.
+    ///
+    /// This function implies that the vector's contents can be cloned.
+    pub fn remove_row(&mut self, y: usize) -> Result<Vec<T>, Vec2DErr>
+    where
+        T: Clone,
+    {
+        if y >= self.height() {
+            return Err(Vec2DErr::OutOfBounds);
+        }
+
+        let start = y * self.width;
+        let end = start + self.width;
+
+        Ok(self.cells.drain(start..end).collect())
+    }
+
     /// Iterates over all cells, yielding their `(x, y)` coordinates and values.
     pub fn iter_xy(&self) -> impl Iterator<Item = ((usize, usize), &T)> {
         let width = self.width;
@@ -406,6 +470,39 @@ impl<T> Vec2D<T> {
         for cell in &mut self.cells {
             f(cell);
         }
+    }
+
+    /// Given the wanted height of our vector, cuts off all the exess rows.
+    pub fn truncate_rows(&mut self, new_height: usize) -> Result<(), Vec2DErr> {
+        if new_height > self.height() {
+            return Err(Vec2DErr::OutOfBounds);
+        } else if new_height == self.height() {
+            return Ok(());
+        }
+
+        let start = new_height * self.width;
+        self.cells.drain(start..);
+
+        Ok(())
+    }
+
+    /// Given the wanted width of our vector, cuts off all the exess columns.
+    pub fn truncate_cols(&mut self, new_width: usize) -> Result<(), Vec2DErr> {
+        if new_width > self.width {
+            return Err(Vec2DErr::WidthMismatch(new_width, self.width));
+        } else if new_width == self.width {
+            return Ok(());
+        }
+
+        for row in (0..self.height()).rev() {
+            let start = row * self.width + new_width;
+            let end = (row + 1) * self.width;
+
+            self.cells.drain(start..end);
+        }
+        self.width = new_width;
+
+        Ok(())
     }
 
     #[inline]
@@ -494,10 +591,10 @@ impl std::fmt::Display for Vec2DErr {
             Vec2DErr::OutOfBounds => {
                 write!(f, "Attempted to acces an index which is out of bounds.")
             }
-            Vec2DErr::WidthMismatch(len, width) => write!(
+            Vec2DErr::WidthMismatch(width1, width2) => write!(
                 f,
-                "Vector length ({}) is not divisible by given width ({}).",
-                len, width
+                "Widths {} and {} are not compatible for the given task.",
+                width1, width2
             ),
             Vec2DErr::ZeroWidth => write!(f, "Width must be bigger than 0."),
             Vec2DErr::ZeroHeight => write!(f, "Height must be bigger than 0."),

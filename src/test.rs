@@ -115,6 +115,18 @@ mod tests {
     }
 
     #[test]
+    fn remove_row_works() {
+        let mut grid = Vec2D::from_vec((0..9).collect(), 3).unwrap();
+
+        let removed = grid.remove_row(2).unwrap();
+        grid.discard_row(0).unwrap();
+
+        assert_eq!(removed, (6..9).collect::<Vec<i32>>());
+        assert_eq!(grid.cells(), (3..6).collect::<Vec<i32>>());
+        assert_eq!(grid.height(), 1);
+    }
+
+    #[test]
     fn iter_xy_visits_all_cells() {
         let grid = Vec2D::from_vec((0..4).collect(), 2).unwrap();
 
@@ -141,6 +153,24 @@ mod tests {
 
         grid.map_in_place(|x| *x *= 2);
         assert_eq!(grid.cells(), &[2, 2, 2, 2]);
+    }
+
+    #[test]
+    fn truncate_rows_works() {
+        let mut grid: Vec2D<u8> = Vec2D::new(2, 5).unwrap();
+
+        grid.truncate_rows(2).unwrap();
+        assert_eq!(grid.height(), 2);
+        assert_eq!(grid.cells(), Vec::from([0, 0, 0, 0,]));
+    }
+
+    #[test]
+    fn truncate_cols_works() {
+        let mut grid = Vec2D::from_vec(Vec::from([1, 2, 3, 1, 2, 3, 1, 2, 3]), 3).unwrap();
+
+        grid.truncate_cols(2).unwrap();
+        assert_eq!(grid.width(), 2);
+        assert_eq!(grid.cells(), Vec::from([1, 2, 1, 2, 1, 2]));
     }
 
     #[test]
