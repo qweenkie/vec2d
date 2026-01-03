@@ -86,6 +86,46 @@ mod tests {
     }
 
     #[test]
+    fn get_bounds_behavior() {
+        let grid = Vec2D::from_vec(vec![1, 2, 3, 4, 5, 6], 3).unwrap();
+
+        // Valid access should work
+        assert_eq!(grid.get(0, 0), Some(&1));
+        assert_eq!(grid.get(2, 1), Some(&6));
+
+        // Out of bounds x should return None (due to x >= width check)
+        assert_eq!(grid.get(3, 0), None);
+        assert_eq!(grid.get(10, 0), None);
+
+        // Out of bounds y should return None (Vec::get handles this)
+        assert_eq!(grid.get(0, 2), None);
+        assert_eq!(grid.get(0, 10), None);
+
+        // Both out of bounds should return None
+        assert_eq!(grid.get(10, 10), None);
+    }
+
+    #[test]
+    fn get_mut_bounds_behavior() {
+        let mut grid = Vec2D::from_vec(vec![1, 2, 3, 4, 5, 6], 3).unwrap();
+
+        // Valid access should work
+        assert_eq!(grid.get_mut(0, 0), Some(&mut 1));
+        assert_eq!(grid.get_mut(2, 1), Some(&mut 6));
+
+        // Out of bounds x should return None (due to x >= width check)
+        assert_eq!(grid.get_mut(3, 0), None);
+        assert_eq!(grid.get_mut(10, 0), None);
+
+        // Out of bounds y should return None (Vec::get handles this)
+        assert_eq!(grid.get_mut(0, 2), None);
+        assert_eq!(grid.get_mut(0, 10), None);
+
+        // Both out of bounds should return None
+        assert_eq!(grid.get_mut(10, 10), None);
+    }
+
+    #[test]
     fn get_row_works() {
         let grid = Vec2D::from_vec((0..6).collect(), 3).unwrap();
 
@@ -223,5 +263,11 @@ mod tests {
         let coords: Vec<_> = neighbors.iter().map(|(c, _)| *c).collect();
 
         assert_eq!(coords, vec![(1, 0), (0, 1), (1, 1)]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_overload_safety() {
+        let _grid = Vec2D::<u128>::new(usize::MAX, usize::MAX).unwrap();
     }
 }

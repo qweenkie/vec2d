@@ -19,3 +19,21 @@
 - Deprecated `cells_mut`, since it allows for more bugs than I would
   like.
 - Added unit tests for all newly introduced functions.
+
+## 0.4.0
+- Fixed major bug in `coords`, where `x` and `y` values were
+  mismatched.
+- Reduced the amount of unnecessary bounds checks in `get`, `get_mut`,
+  `get_row`, and `get_row_mut`.
+- Removed the redundant requirement for `T: Clone` in `remove_row`.
+- Added `ZeroWidth` and `ZeroHeight` errors for `truncate_rows` and
+  `truncate_cols` respectively.
+- Massively optimized `truncate_cols` by reducing the time complexity
+  from `O(n ^ 2)` to `O(n)` *(while mantaining the `O(1)` space
+  complexity)*.
+- Fixed bug in private `in_bounds` function used for bounds checking,
+  where an overflow was possible when casting from `usize` to `isize`.
+- Fixed typo in implementation of `std::fmt::Display` for
+  `Vec2DErr::OutOfBounds`.
+- Added extra unit tests to assert bounds checking logic.
+

@@ -132,6 +132,8 @@ impl<T> Vec2D<T> {
     where
         T: Default + Clone,
     {
+        assert!(width * height < usize::MAX, "Vector size overflow.");
+
         if width == 0 {
             return Err(Vec2DErr::ZeroWidth);
         } else if height == 0 {
@@ -153,6 +155,8 @@ impl<T> Vec2D<T> {
     where
         T: Clone,
     {
+        assert!(width * height < usize::MAX, "Vector size overflow.");
+
         if width == 0 {
             return Err(Vec2DErr::ZeroWidth);
         } else if height == 0 {
@@ -175,6 +179,8 @@ impl<T> Vec2D<T> {
         height: usize,
         constructor: impl Fn() -> T,
     ) -> Result<Self, Vec2DErr> {
+        assert!(width * height < usize::MAX, "Vector size overflow.");
+
         if width == 0 {
             return Err(Vec2DErr::ZeroWidth);
         } else if height == 0 {
@@ -211,7 +217,44 @@ impl<T> Vec2D<T> {
         Ok(Self { cells: vec, width })
     }
 
+    /// Constructs a grid from an existing slice and a given width.
+    /// The slice length must be a multiple of `width`.
+    ///
+    /// # Errors
+    /// Returns `Vec2DErr::ZeroWidth` if `width == 0`.
+    ///
+    /// Returns `Vec2DErr::EmptySource` if the source slice is empty.
+    ///
+    /// Returns `Vec2DErr::WidthMismatch(slice.len(), width)` if the source
+    /// vector's length is not divisible by the given `width`.
+    pub fn from_slice(slice: &[T], width: usize) -> Result<Self, Vec2DErr>
+    where
+        T: Clone,
+    {
+        if width == 0 {
+            return Err(Vec2DErr::ZeroWidth);
+        } else if slice.is_empty() {
+            return Err(Vec2DErr::EmptySource);
+        }
+        if !slice.len().is_multiple_of(width) {
+            return Err(Vec2DErr::WidthMismatch(slice.len(), width));
+        }
+
+        Ok(Self {
+            cells: slice.to_vec(),
+            width,
+        })
+    }
+
+    /// Clears the grid, discarding all the values.
+    /// Sets `width` to 0.
+    pub fn clear(&mut self) {
+        self.cells.clear();
+        self.width = 0;
+    }
+
     /// Returns a shared slice of all cells in row-major order.
+    #[inline]
     pub fn cells(&self) -> &[T] {
         &self.cells
     }
@@ -225,11 +268,13 @@ impl<T> Vec2D<T> {
     // }
 
     /// Returns the width of the grid.
+    #[inline]
     pub const fn width(&self) -> usize {
         self.width
     }
 
     /// Returns the height of the grid.
+    #[inline]
     pub const fn height(&self) -> usize {
         self.cells.len() / self.width
     }
@@ -249,9 +294,9 @@ impl<T> Vec2D<T> {
     ///
     /// Returns `None` if the coordinates are out of bounds.
     pub fn coords(&self, idx: usize) -> Option<(usize, usize)> {
-        let (x, y) = (idx / self.width, idx % self.width);
+        let (x, y) = (idx % self.width, idx / self.width);
 
-        if x < self.width && y < self.height() {
+        if y < self.height() {
             Some((x, y))
         } else {
             None
@@ -274,25 +319,25 @@ impl<T> Vec2D<T> {
 
     /// Returns a shared reference to the cell at `(x, y)`, if it exists.
     pub fn get(&self, x: usize, y: usize) -> Option<&T> {
-        if x >= self.width || y >= self.height() {
-            return None;
+        if x >= self.width {
+            None
+        } else {
+            self.cells.get(y * self.width + x)
         }
-
-        self.cells.get(y * self.width + x)
     }
 
     /// Returns a mutable reference to the cell at `(x, y)`, if it exists.
     pub fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut T> {
-        if x >= self.width || y >= self.height() {
-            return None;
+        if x >= self.width {
+            None
+        } else {
+            self.cells.get_mut(y * self.width + x)
         }
-
-        self.cells.get_mut(y * self.width + x)
     }
 
     /// Returns a shared slice representing row `y`, if it exists.
     pub fn get_row(&self, y: usize) -> Option<&[T]> {
-        if y >= self.cells.len() / self.width {
+        if y >= self.height() {
             return None;
         }
 
@@ -303,7 +348,7 @@ impl<T> Vec2D<T> {
 
     /// Returns a mutable slice representing row `y`, if it exists.
     pub fn get_row_mut(&mut self, y: usize) -> Option<&mut [T]> {
-        if y >= self.cells.len() / self.width {
+        if y >= self.height() {
             return None;
         }
 
@@ -418,12 +463,7 @@ impl<T> Vec2D<T> {
     }
 
     /// Removes a row at the given y coordinate, returning the removed values.
-    ///
-    /// This function implies that the vector's contents can be cloned.
-    pub fn remove_row(&mut self, y: usize) -> Result<Vec<T>, Vec2DErr>
-    where
-        T: Clone,
-    {
+    pub fn remove_row(&mut self, y: usize) -> Result<Vec<T>, Vec2DErr> {
         if y >= self.height() {
             return Err(Vec2DErr::OutOfBounds);
         }
@@ -478,6 +518,8 @@ impl<T> Vec2D<T> {
             return Err(Vec2DErr::OutOfBounds);
         } else if new_height == self.height() {
             return Ok(());
+        } else if new_height == 0 {
+            return Err(Vec2DErr::ZeroHeight);
         }
 
         let start = new_height * self.width;
@@ -492,21 +534,24 @@ impl<T> Vec2D<T> {
             return Err(Vec2DErr::WidthMismatch(new_width, self.width));
         } else if new_width == self.width {
             return Ok(());
+        } else if new_width == 0 {
+            return Err(Vec2DErr::ZeroWidth);
         }
 
-        for row in (0..self.height()).rev() {
-            let start = row * self.width + new_width;
-            let end = (row + 1) * self.width;
+        let mut idx = 0;
+        self.cells.retain(|_| {
+            let keep = idx % self.width < new_width;
 
-            self.cells.drain(start..end);
-        }
+            idx += 1;
+            keep
+        });
+
         self.width = new_width;
-
         Ok(())
     }
 
     #[inline]
-    fn in_bounds(&self, x: isize, y: isize) -> bool {
+    fn in_bounds(&self, x: i128, y: i128) -> bool {
         x >= 0 && y >= 0 && (x as usize) < self.width && (y as usize) < self.height()
     }
 
@@ -522,10 +567,10 @@ impl<T> Vec2D<T> {
         x: usize,
         y: usize,
     ) -> impl Iterator<Item = ((usize, usize), &T)> {
-        let x = x as isize;
-        let y = y as isize;
+        let x = x as i128;
+        let y = y as i128;
 
-        const OFFSETS: [(isize, isize); 4] = [(0, -1), (-1, 0), (1, 0), (0, 1)];
+        const OFFSETS: [(i128, i128); 4] = [(0, -1), (-1, 0), (1, 0), (0, 1)];
         OFFSETS.iter().filter_map(move |(dx, dy)| {
             let nx = x + dx;
             let ny = y + dy;
@@ -552,10 +597,10 @@ impl<T> Vec2D<T> {
         x: usize,
         y: usize,
     ) -> impl Iterator<Item = ((usize, usize), &T)> {
-        let x = x as isize;
-        let y = y as isize;
+        let x = x as i128;
+        let y = y as i128;
 
-        const OFFSETS: [(isize, isize); 8] = [
+        const OFFSETS: [(i128, i128); 8] = [
             // Top row
             (-1, -1),
             (0, -1),
@@ -589,7 +634,7 @@ impl std::fmt::Display for Vec2DErr {
         match self {
             Vec2DErr::EmptySource => write!(f, "Source vector is empty."),
             Vec2DErr::OutOfBounds => {
-                write!(f, "Attempted to acces an index which is out of bounds.")
+                write!(f, "Attempted to access an index which is out of bounds.")
             }
             Vec2DErr::WidthMismatch(width1, width2) => write!(
                 f,
